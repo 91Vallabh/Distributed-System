@@ -212,23 +212,6 @@ public class GroupMessengerActivity extends Activity {
 
         }
 
-
-//        public void upFailedNode(){
-//            int index2=-1;
-//            if(portStr.equals("11108"))
-//                index2=0;
-//            if(portStr.equals("11112"))
-//                index2=1;
-//            if(portStr.equals("11116"))
-//                index2=2;
-//            if(portStr.equals("11120"))
-//                index2=3;
-//            if(portStr.equals("11124"))
-//                index2=4;
-//            Log.v("Server"," failed port is:"+portStr+" detected at : "+portId);
-//            failNode[index2]=-1;
-//        }
-
         //handling failed node
         public void removeFailedNode(){
 
@@ -322,24 +305,17 @@ public class GroupMessengerActivity extends Activity {
                     try {
                         serverSocket.setSoTimeout(4000);
                         incomingSocket = serverSocket.accept();
-
-//                        portStr = String.valueOf(serverSocket.accept().getPort());
-//                        din  = new DataInputStream(incomingSocket.getInputStream());
                         inReader = new BufferedReader(new InputStreamReader(incomingSocket.getInputStream()));
                         PrintStream out = new PrintStream(incomingSocket.getOutputStream());
 
 
-                        //reading from client
-//                        String inR= din.readLine();
-
                         String inR = inReader.readLine();
 
                         String[] inputs = inR.split("~");
-                        Log.v("Server","Message received id: "+ inputs[0]+ "   message: "+inputs[1]);
+//                        Log.v("Server","Message received id: "+ inputs[0]+ "   message: "+inputs[1]);
                             //removing failed node messages which are not deliverable
                             removeFailedNode();
 
-                            /*       */
 
                             if (hmapD.containsKey(inputs[0])) {
 
@@ -358,7 +334,7 @@ public class GroupMessengerActivity extends Activity {
                                     if (rorder[0].equals(inputs[0])) {
                                         tempSeq = Double.parseDouble(inputs[2]);
                                         rorder[2] = Double.toString(tempSeq);
-                                Log.v("Server:", "  at server msg id being updates is: "+ rorder[0]+"  message : "+ rorder[1]+"   final seq num is: "+rorder[2]);
+//                                Log.v("Server:", "  at server msg id being updates is: "+ rorder[0]+"  message : "+ rorder[1]+"   final seq num is: "+rorder[2]);
                                         l.add(rorder);
                                         break;
                                     }
@@ -377,11 +353,11 @@ public class GroupMessengerActivity extends Activity {
                                 while ((pQueue.size() > 0) && hmapD.get(pQueue.peek()[0]) == 1) {
 //                            Log.v("Server:", " Avd at port : "+portId+"  priority queue size is before delivering  "+pQueue.size());
                                     String[] sttr = pQueue.poll();
-                            Log.v("Server: ", "  msg being delivered is : "+sttr[0]+ "   "+ sttr[1]+"  with seq as : "+ sttr[2]);
+//                            Log.v("Server: ", "  msg being delivered is : "+sttr[0]+ "   "+ sttr[1]+"  with seq as : "+ sttr[2]);
 //                            if(pQueue.size()>0)
 //                                Log.v("Server: ", "  after delivery next smallest msg id is : "+pQueue.peek()[0]+ "   "+ pQueue.peek()[1]+"  with seq as : "+ pQueue.peek()[2]);
                                     publishProgress(sttr);
-                                    Log.v("Server","After delivery of msg id: "+sttr[1]+"   queue size is: "+pQueue.size());
+//                                    Log.v("Server","After delivery of msg id: "+sttr[1]+"   queue size is: "+pQueue.size());
                                 }
 
 
@@ -389,7 +365,6 @@ public class GroupMessengerActivity extends Activity {
                                 //write back to client
                                 out.println("done");
                                 out.flush();
-//                                din.close();
                                 out.close();
                             } else {
                                 String[] re = seqGenerator(inputs);
@@ -516,7 +491,7 @@ public class GroupMessengerActivity extends Activity {
                         out.println(opMsg);
 
                         String opMsg12[] = opMsg.split("~");
-                        Log.v("From client", "Client sending new nessage, msg id is: "+opMsg12[0]+"  message is: "+opMsg12[1]);
+//                        Log.v("From client", "Client sending new nessage, msg id is: "+opMsg12[0]+"  message is: "+opMsg12[1]);
 
 
 
@@ -524,11 +499,11 @@ public class GroupMessengerActivity extends Activity {
                         //          RECEIVING SEQUENCE NUMBER FROM SERVER
                         //     msgID       message           sequence num
 
-                        Log.v("Client","waiting for ack"+ "  from port "+ port);
+//                        Log.v("Client","waiting for ack"+ "  from port "+ port);
 //                        String inStr = din.readUTF();
                         String inStr = inReader.readLine();
 //                        Log.v("To Client", "Client reived seq num from port id: "+ port+"  msgid: "+ inputs[0]+ "   mesage is : "+ inputs[1]+"  seq num receieved is: "+inputs[2]);
-                        Log.v("Client","ack received");
+//                        Log.v("Client","ack received");
                         inputs = inStr.split("~");
                         pseq[index++] = Double.parseDouble(inputs[2]);
                         inReader.close();
@@ -617,8 +592,6 @@ public class GroupMessengerActivity extends Activity {
                         String opMsg = inputs[0] + "~" + inputs[1] + "~" + inputs[2];
                         out.println(opMsg);
 //                        Log.v("Final client", "Final sequnce num from clinet for message id: "+inputs[0]+"  message: "+inputs[1]+"   seq num is: "+inputs[2]);
-//                        din.close();
-//                        din.readUTF();
                         inReader.readLine();
                         inReader.close();
                         out.close();
