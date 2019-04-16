@@ -16,6 +16,7 @@ import android.widget.EditText;
 import android.widget.TextView;
 
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.DataInputStream;
 import java.io.EOFException;
 import java.io.FileNotFoundException;
@@ -24,6 +25,7 @@ import java.io.InputStreamReader;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
+import java.io.OutputStreamWriter;
 import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.io.StreamCorruptedException;
@@ -303,7 +305,7 @@ public class GroupMessengerActivity extends Activity {
                 while(true){
 
                     try {
-                        serverSocket.setSoTimeout(4000);
+                        serverSocket.setSoTimeout(3500);
                         incomingSocket = serverSocket.accept();
                         inReader = new BufferedReader(new InputStreamReader(incomingSocket.getInputStream()));
                         PrintStream out = new PrintStream(incomingSocket.getOutputStream());
@@ -359,9 +361,7 @@ public class GroupMessengerActivity extends Activity {
                                     publishProgress(sttr);
 //                                    Log.v("Server","After delivery of msg id: "+sttr[1]+"   queue size is: "+pQueue.size());
                                 }
-
-
-                                //
+                              //
                                 //write back to client
                                 out.println("done");
                                 out.flush();
@@ -388,22 +388,7 @@ public class GroupMessengerActivity extends Activity {
                         se.printStackTrace();
                         removeFailedNodeException();
                         continue;
-                    }catch(StreamCorruptedException se){
-                        Log.e("Server","stream corrupted Exception at server side  ");
-                        se.printStackTrace();
-                        removeFailedNodeException();
-                        continue;
-                    } catch(EOFException se){
-                        Log.e("Server","EOF Exception at server side  ");
-                        se.printStackTrace();
-                        removeFailedNodeException();
-                        continue;
-                    } catch(FileNotFoundException se) {
-                        Log.e("Server","FNF Exception at server side  ");
-                        se.printStackTrace();
-                        removeFailedNodeException();
-                        continue;
-                    } catch(IOException se){
+                    }catch(IOException se){
                         Log.e("Server","IO Exception at server side  ");
                         se.printStackTrace();
                         removeFailedNodeException();
@@ -456,23 +441,15 @@ public class GroupMessengerActivity extends Activity {
                 String[] inputs = null;
 
                 for(String port:REMOTE_PORT) {
-                    if(port.equals("11108"))
-                        failIndex=0;
-                    if(port.equals("11112"))
-                        failIndex=1;
-                    if(port.equals("11116"))
-                        failIndex=2;
-                    if(port.equals("11120"))
-                        failIndex=3;
-                    if(port.equals("11124"))
-                        failIndex=4;
                     try {
+                        String p=port;
 
                         socket = new Socket(InetAddress.getByAddress(new byte[]{10, 0, 2, 2}),
                                 Integer.parseInt(port));
-                        socket.setSoTimeout(3000);
+                        socket.setSoTimeout(2000);
 
                         String msgToSend = msgs[0];
+
                         /*
                          *creating message id
                          */
@@ -485,16 +462,12 @@ public class GroupMessengerActivity extends Activity {
 //                        DataInputStream din = new DataInputStream(socket.getInputStream());
                         PrintStream out = new PrintStream(socket.getOutputStream());
 
-
 //                                  SEDNING MESSAGE
 //                        Log.v("Client","before sending");
                         out.println(opMsg);
 
                         String opMsg12[] = opMsg.split("~");
 //                        Log.v("From client", "Client sending new nessage, msg id is: "+opMsg12[0]+"  message is: "+opMsg12[1]);
-
-
-
 
                         //          RECEIVING SEQUENCE NUMBER FROM SERVER
                         //     msgID       message           sequence num
@@ -511,55 +484,36 @@ public class GroupMessengerActivity extends Activity {
                         out.close();
                         socket.close();
                     }catch(NullPointerException se){
-                        Log.e("Client","Null pointer Exception at client side  "+ "   port:  "+port);
-                        se.printStackTrace();
-                        failNode[failIndex] = -1;
-                        pseq[index++] = Double.valueOf(0);
+                        GroupMessengerActivity.this.runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                new FailedClient().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, p);
+                            }
+                        });
                         socket.close();
                         continue;
                     }catch(SocketTimeoutException se){
-                        Log.e("Client","timeout Exception at client side  "+ "   port:  "+port);
-                        se.printStackTrace();
-                        failNode[failIndex] = -1;
-                        pseq[index++] = Double.valueOf(0);
+                        GroupMessengerActivity.this.runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                new FailedClient().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, port);
+                            }
+                        });
                         socket.close();
                         continue;
-                    }catch(StreamCorruptedException se){
-                        Log.e("Client","Stream Corrupted Exception at client side  "+ "   port:  "+port);
-                        se.printStackTrace();
-                        failNode[failIndex] = -1;
-                        pseq[index++] = Double.valueOf(0);
-                        socket.close();
-                        continue;
-                    } catch(EOFException se){
-                        Log.e("Client","EOF Exception at client side  "+ "   port:  "+port);
-                        se.printStackTrace();
-                        failNode[failIndex] = -1;
-                        pseq[index++] = Double.valueOf(0);
-                        socket.close();
-                        continue;
-                    }catch(FileNotFoundException fe){
-                        Log.e("Client","FNF Exception at client side  "+ "   port:  "+port);
-                        fe.printStackTrace();
-                        failNode[failIndex] = -1;
-                        pseq[index++] = Double.valueOf(0);
-                        socket.close();
-                        continue;
-                    } catch(IOException se){
-                        Log.e("Client","IO Exception at client side  "+ "   port:  "+port);
-                        se.printStackTrace();
-                        failNode[failIndex] = -1;
-                        pseq[index++] = Double.valueOf(0);
+                    }catch(IOException se){
+                        GroupMessengerActivity.this.runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                new FailedClient().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, port);
+                            }
+                        });
                         socket.close();
                         continue;
                     }
                 }
 
-
-
                 /*           remulticasting final sequnce number to all avds                    */
-
-
                 //highest seqnumber
                 Double max = pseq[0];
                 for(double d : pseq){
@@ -569,21 +523,11 @@ public class GroupMessengerActivity extends Activity {
                 inputs[2] = Double.toString(max);
 //                Log.v("AT Client: ", "Final seq for message id: "+inputs[0]+ "  message is : "+inputs[1]+"   final sequnce num is : "+inputs[2]);
 
-                for(String port:REMOTE_PORT) {
-                    if(port.equals("11108"))
-                        failIndex=0;
-                    if(port.equals("11112"))
-                        failIndex=1;
-                    if(port.equals("11116"))
-                        failIndex=2;
-                    if(port.equals("11120"))
-                        failIndex=3;
-                    if(port.equals("11124"))
-                        failIndex=4;
+                for(String port:REMOTE_PORT) {;
                     try {
                         socket = new Socket(InetAddress.getByAddress(new byte[]{10, 0, 2, 2}),
                                 Integer.parseInt(port));
-                        socket.setSoTimeout(3000);
+                        socket.setSoTimeout(2000);
                         BufferedReader inReader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 //                        DataInputStream din = new DataInputStream(socket.getInputStream());
                         PrintStream out = new PrintStream(socket.getOutputStream());
@@ -597,49 +541,27 @@ public class GroupMessengerActivity extends Activity {
                         out.close();
                         socket.close();
                     }catch(SocketTimeoutException se){
-                        Log.e("Client","2nd time timeout Exception at client side  "+ "   port:  "+port);
-                        se.printStackTrace();
-                        failNode[failIndex] = -1;
-                        socket.close();
-                        continue;
-                    }catch(StreamCorruptedException se){
-                        Log.e("Client","2nd time Stream Corrupted Exception at client side  "+ "   port:  "+port);
-                        se.printStackTrace();
-                        failNode[failIndex] = -1;
-                        socket.close();
-                        continue;
-                    } catch(EOFException se){
-                        Log.e("Client","2nd time EOF Exception at client side  "+ "   port:  "+port);
-                        se.printStackTrace();
-                        failNode[failIndex] = -1;
-                        socket.close();
-                        continue;
-                    }catch(FileNotFoundException fe){
-                        Log.e("Client","2nd time FNF Exception at client side  "+ "   port:  "+port);
-                        fe.printStackTrace();
-                        failNode[failIndex] = -1;
+                        GroupMessengerActivity.this.runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                new FailedClient().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, port);
+                            }
+                        });
                         socket.close();
                         continue;
                     } catch(IOException se){
-                        Log.e("Client","2nd time IO Exception at client side  "+ "   port:  "+port);
-                        se.printStackTrace();
-                        failNode[failIndex] = -1;
+                        GroupMessengerActivity.this.runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                new FailedClient().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, port);
+                            }
+                        });
                         socket.close();
                         continue;
                     }
                 }
-
-
-
 //                Log.v("Client thread end","all message delivered");
-            } catch (UnknownHostException e) {
-                Log.e(TAG, "ClientTask UnknownHostException");
-                e.printStackTrace();
-            } catch (IOException e) {
-                Log.e(TAG, "ClientTask socket IOException");
-                e.printStackTrace();
-            }
-            catch(Exception e){
+            } catch(Exception e){
                 Log.e("Client","Exception at client side  ");
                 e.printStackTrace();
             }
@@ -648,15 +570,38 @@ public class GroupMessengerActivity extends Activity {
         }
     }
 
+
+
+
+
+
+
+    public class FailedClient extends  AsyncTask<String, Void, Void> {
+
+        @Override
+        protected Void doInBackground(String... strings) {
+            String port = strings[0];
+            String remotePort=null;
+            for (remotePort:REMOTE_PORT) {
+                String msg = "FAILED" + ":" + port;
+                Socket socket = null;
+                try {
+                    socket = new Socket(InetAddress.getByAddress(new byte[]{10, 0, 2, 2}),
+                            Integer.parseInt(remotePort));
+                    BufferedReader input = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+                    PrintWriter out = new PrintWriter(new BufferedWriter(new OutputStreamWriter(socket.getOutputStream())), true);
+                    //sending mesage
+                    out.println(msg);
+                    input.readLine();
+                    socket.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+            return null;
+        }
+    }
+
 }
 
 
-/*
- *https://developer.android.com/reference/android/database/Cursor.html
- * https://developer.android.com/reference/android/content/ContentUris.html#withAppendedId(android.net.Uri,%20long)
- * https://developer.android.com/reference/android/database/MatrixCursor.html#addRow(java.lang.Object[])
- * https://developer.android.com/guide/topics/providers/content-provider-creating#Query
- *
- *
- *
- */
