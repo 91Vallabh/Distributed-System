@@ -65,24 +65,24 @@ public class SimpleDynamoProvider extends ContentProvider {
 		String portStr = tel.getLine1Number().substring(tel.getLine1Number().length() - 4);
 		final String myPort = String.valueOf((Integer.parseInt(portStr) * 2));
 		Log.e("My Port",myPort);
-		myPortt = myPort;
+		this.myPortt = myPort;
 
 
 		try {
-			nodeId = genHash(Integer.toString(Integer.parseInt(myPort) / 2));// 5554
-			Log.i("node", nodeId);
+			this.nodeId = genHash(Integer.toString(Integer.parseInt(myPort) / 2));// 5554
+			Log.i("node", this.nodeId);
 		} catch (NoSuchAlgorithmException e) {
 			e.printStackTrace();
 		}
 
 		//create a list of all nodes their hashed value and their port
 		initializeNodeInfo();
-		Log.i("initializeNodeInfo","Chord ring size is: "+ nodeList.size());
-		Log.i("initializeNodeInfo","Chord ring is: "+ Arrays.toString(nodeList.toArray()));
+		Log.i("initializeNodeInfo","Chord ring size is: "+ this.nodeList.size());
+		Log.i("initializeNodeInfo","Chord ring is: "+ Arrays.toString(this.nodeList.toArray()));
 		//creates a preference list
 		createPreferenceList();
-		Log.i("createPreferenceList","preference list size is: "+ preferenceList.size());
-		Log.i("createPreferenceList","preference list is: "+ Arrays.toString(preferenceList.toArray()));
+		Log.i("createPreferenceList","preference list size is: "+ this.preferenceList.size());
+		Log.i("createPreferenceList","preference list is: "+ Arrays.toString(this.preferenceList.toArray()));
 
 		//create a server for this avd
 		try {
@@ -96,18 +96,18 @@ public class SimpleDynamoProvider extends ContentProvider {
 	}
 
 	private void createPreferenceList(){
-		int index = nodeList.indexOf(nodeId);
+		int index = this.nodeList.indexOf(this.nodeId);
 		// 0 1 2 3 4
-		Log.i("createPreferenceList","node is: "+dhtNodes.get(nodeId)+"  index in chord is: "+index);
-		if (index < (nodeList.size()-2)) {
-			preferenceList.add(nodeList.get(nodeList.indexOf(nodeId)+1));
-			preferenceList.add(nodeList.get(nodeList.indexOf(nodeId)+2));
+		Log.i("createPreferenceList","node is: "+this.dhtNodes.get(this.nodeId)+"  index in chord is: "+index);
+		if (index < (this.nodeList.size()-2)) {
+			this.preferenceList.add(this.nodeList.get(this.nodeList.indexOf(this.nodeId)+1));
+			this.preferenceList.add(this.nodeList.get(this.nodeList.indexOf(this.nodeId)+2));
 		} else if (index < (nodeList.size()-1)) {
-			preferenceList.add(nodeList.get(nodeList.indexOf(nodeId)+1));
-			preferenceList.add(nodeList.get(0));
+			this.preferenceList.add(this.nodeList.get(this.nodeList.indexOf(this.nodeId)+1));
+			this.preferenceList.add(this.nodeList.get(0));
 		} else if (index == (nodeList.size()-1)){
-			preferenceList.add(nodeList.get(0));
-			preferenceList.add(nodeList.get(1));
+			this.preferenceList.add(this.nodeList.get(0));
+			this.preferenceList.add(this.nodeList.get(1));
 		}
 	}
 
@@ -128,24 +128,24 @@ public class SimpleDynamoProvider extends ContentProvider {
 
 	//a function which takes a key and returns which avd it belongs to
 	private String targetNode(String keyy){
-		String keyHashed = null;
-		try{
-			keyHashed = genHash(keyy);
-		} catch (NoSuchAlgorithmException e) {
-			e.printStackTrace();
-		}
+		String keyHashed = keyy;
+//		try{
+//			keyHashed = genHash(keyy);
+//		} catch (NoSuchAlgorithmException e) {
+//			e.printStackTrace();
+//		}
 		String node = null;
-		for(String temp:nodeList){
+		for(String temp:this.nodeList){
 			if(keyHashed.compareTo(temp) <=0){
 				node=temp;
 				break;
 			}
 		}
 		if(node == null){
-			node = nodeList.get(0);
+			node = this.nodeList.get(0);
 		}
-		Log.i("targetNode"," key to be found is: "+keyy+" target node found is: "+dhtNodes.get(node) + " target node hashed is: "+node);
-		return dhtNodes.get(node);
+		Log.i("targetNode"," key to be found is: "+keyy+" target node found is: "+this.dhtNodes.get(node) + " target node hashed is: "+node);
+		return this.dhtNodes.get(node);
 	}
 
 
@@ -172,7 +172,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 	}
 
 	private boolean isContainedInAvd(String keym){
-		return msgMap.contains(keym);
+		return this.msgMap.contains(keym);
 	}
 
 	private Cursor getCursorOBJ(String selection){
@@ -216,6 +216,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 			outputStream = getContext().openFileOutput(keyMsg, Context.MODE_PRIVATE);
 			outputStream.write(line11.getBytes());
 			outputStream.close();
+			this.msgMap.add(keyMsg);
 			Log.i("key Insert", "  port: " + myPortt + "  inserted key : " + keyMsg + "   key hashed value  " + keyHashed + "  value: " + line11);
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
@@ -233,85 +234,121 @@ public class SimpleDynamoProvider extends ContentProvider {
 		Log.i("insert", " insert going from: "+myPortt+" sending to preference node: "+dhtNodes.get(preferenceList.get(1))+ " key is: "+ keyMsg+"  msg is: "+ line11);
 	}
 
+
 	@Override
 	public Uri insert(Uri uri, ContentValues values) {
-		// TODO Auto-generated method stub
-		// insert request came at wrong avd
-		// insert request came at right avd
-		// inser came from another avd
-
-		String keyMsg;
-		String valueMsg[];
-		int version=0;
-		String values1=null;
-
-		keyMsg =  values.get("key").toString();
-		valueMsg  =  values.get("value").toString().split("\\.");
-		try {
-			version = Integer.parseInt(valueMsg[1]);
-			Log.i("insert", "for msg key : "+ keyMsg+" version is: "+version);
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-
-		String keyHashed="";
-		try {
-			keyHashed = genHash(keyMsg);
-		} catch (NoSuchAlgorithmException e) {
-			e.printStackTrace();
-		}
-		Log.i("in insert: ", "insert key: "+ keyMsg+ " hashed kymsg: "+keyHashed);
-
-
-		String trgtNode = targetNode(keyHashed);
-		if(trgtNode.equals(myPortt)) {
-			Log.i("insert", " key :"+keyMsg+"  is to ber stored at this avd: "+myPortt);
-			// insert here and at 2 successor node
-			if(isContainedInAvd(keyMsg)) {
-				Log.i("insert"," msg is already contained in this avd");
-				MatrixCursor mx = (MatrixCursor) getFileFromAvd(makeUriObj(),keyMsg);
-				mx.moveToFirst();
-				//compare the version number
-				int ver = Integer.parseInt(mx.getString(1).split("\\.")[1]) + 1;
-				try{
-					ver = Math.max(ver, version);
-				} catch (Exception e) {
-					e.printStackTrace();
-				}
-				String mssg = mx.getString(1).split("\\.")[0];
-				String send = mx.getString(1).split("\\.")[2];
-				String line11 = mssg + "."+Integer.toString(ver) + "."+send;
-				inserMsg(keyMsg, line11, keyHashed);
-				Log.i("insert"," key "+keyMsg+" is being stored with version :"+ ver);
-				if(send.equals(myPortt)){
-					sendToPreferences(keyMsg,line11);
-				}
-			} else {
-				//create version number
-				//insert it
-				//check whether to send forwrd
-				Log.i("insert"," this avd : "+myPortt+"  does not contain this msg: "+keyMsg);
-				String send=myPortt;
-				if(valueMsg.length>1){
-					send = valueMsg[2];
-				}
-				String line11 = valueMsg[0] + Integer.toString(version++) + send;
-				inserMsg(keyMsg, line11, keyHashed);
-				if(send.equals(myPortt)){
-					sendToPreferences(keyMsg,line11);
-				}
-			}
-		} else {//wrong avd
-			// append true to sendToPreferenceNode
-			// send to trgtNode
-			String OpMsg = "insertWAVD"+"-"+ trgtNode  +"-"+keyMsg+"-"+valueMsg;
-			new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, OpMsg);
-			Log.i("insert", " insert came at wrong avd: "+myPortt+" sending to: "+trgtNode+ " key is: "+ keyMsg);
-		}
-
-
 		return null;
 	}
+
+
+
+
+//	@Override
+//	public Uri insert(Uri uri, ContentValues values) {
+//		// TODO Auto-generated method stub
+//		// insert request came at wrong avd
+//		// insert request came at right avd
+//		// inser came from another avd
+//
+//		String keyMsg;
+//		String valueMsg[];
+//		int version=0;
+//		String values1=null;
+//		String tempcheck=null;
+//		keyMsg =  values.get("key").toString();
+//		valueMsg  =  values.get("value").toString().split("\\.");
+//		try {
+//			version = Integer.parseInt(valueMsg[1]);
+//			tempcheck = valueMsg[3];
+//			Log.i("insert", "for msg key : "+ keyMsg+" version is: "+version);
+//		} catch (Exception e) {
+//			e.printStackTrace();
+//		}
+//
+//		String keyHashed="";
+//		try {
+//			keyHashed = genHash(keyMsg);
+//		} catch (NoSuchAlgorithmException e) {
+//			e.printStackTrace();
+//		}
+//		Log.i("in insert: ", "insert key: "+ keyMsg+ " hashed kymsg: "+keyHashed);
+//
+//
+//		String trgtNode = targetNode(keyHashed);
+//		if(trgtNode.equals(this.myPortt)) {
+//			Log.i("insert", " key :"+keyMsg+"  is to ber stored at this avd: "+this.myPortt);
+//			// insert here and at 2 successor node
+//			if(isContainedInAvd(keyMsg)) {
+//				Log.i("insert"," msg is already contained in this avd");
+//				MatrixCursor mx = (MatrixCursor) getFileFromAvd(makeUriObj(),keyMsg);
+//				mx.moveToFirst();
+//				//compare the version number
+//				int ver = Integer.parseInt(mx.getString(1).split("\\.")[1]) + 1;
+//				try{
+//					ver = Math.max(ver, version);
+//				} catch (Exception e) {
+//					e.printStackTrace();
+//				}
+//				String mssg = mx.getString(1).split("\\.")[0];
+//				String send = mx.getString(1).split("\\.")[2];
+//				String line11 = mssg + "."+Integer.toString(ver) + "."+send;
+//				inserMsg(keyMsg, line11, keyHashed);
+//				Log.i("insert"," key "+keyMsg+" is being stored with version :"+ ver);
+//				if(send.equals(this.myPortt)){
+//					sendToPreferences(keyMsg,line11);
+//				}
+//			} else {
+//				//create version number
+//				//insert it
+//				//check whether to send forwrd
+//				Log.i("insert"," this avd : "+myPortt+"  does not contain this msg: "+keyMsg);
+//				String send=this.myPortt;
+////				if(valueMsg.length>1){
+////					send = valueMsg[2];
+////					Log.i("insert", " send is updated to :"+send+ " my port is; "+this.myPortt);
+////				}
+//				String line11 = valueMsg[0] + "."+Integer.toString(1)+"." + send;
+//				Log.i("line1111",line11);
+//				inserMsg(keyMsg, line11, keyHashed);
+//				sendToPreferences(keyMsg,line11);
+////				if(send.equals(this.myPortt)){
+////					sendToPreferences(keyMsg,line11);
+////				}
+//			}
+//		} else {//wrong avd
+//			// append true to sendToPreferenceNode
+//			// send to trgtNode
+//			if(tempcheck !=null){//from coordinator
+//				if(isContainedInAvd(keyMsg)) {//updating msg
+//					Log.i("insert"," msg from coordinator and is already contained in this avd");
+//					MatrixCursor mx = (MatrixCursor) getFileFromAvd(makeUriObj(),keyMsg);
+//					mx.moveToFirst();
+//					//compare the version number
+//					int ver = Integer.parseInt(mx.getString(1).split("\\.")[1]) + 1;
+//					try{
+//						ver = Math.max(ver, version);
+//					} catch (Exception e) {
+//						e.printStackTrace();
+//					}
+//					String mssg = mx.getString(1).split("\\.")[0];
+//					String send = mx.getString(1).split("\\.")[2];
+//					String line11 = mssg + "."+Integer.toString(ver) + "."+send;
+//					inserMsg(keyMsg, line11, keyHashed);
+//					Log.i("insert"," key "+keyMsg+" is being stored with version :"+ ver);
+//				}else {//from coordinator but msg coming for first time
+//					inserMsg(keyMsg, (values.get("value").toString()), keyHashed);
+//					Log.i("insert pref", " came from coordinator key is: " + keyMsg);
+//				}
+//			} else {
+//				String OpMsg = "insertWAVD" + "-" + trgtNode + "-" + keyMsg + "-" + valueMsg[0];
+//				new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, OpMsg);
+//				Log.i("insert", " insert came at wrong avd: " + this.myPortt + " sending to: " + trgtNode + " key is: " + keyMsg + "  msg is :" + valueMsg[0]);
+//			}
+//		}
+//
+//
+//		return null;
+//	}
 
 	@Override
 	public Cursor query(Uri uri, String[] projection, String selection,
@@ -375,7 +412,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 					String[] inMessage = inReader.readLine().split("\\-");
 					//String OpMsg = "insertPref"+"-"+ dhtNodes.get(preferenceList.get(0))+"-"+keyMsg+"-"+line11;
 					if(inMessage[0].equals("insertWAVD") || inMessage[0].equals("insertPref")) {
-						Log.i("server", "Insert on avd: "+inMessage[1] + " key: "+ inMessage[2]+  " msg "+inMessage[2]);
+						Log.i("server", "Insert on avd: "+inMessage[1] + " key: "+ inMessage[2]+  " msg "+inMessage[3]);
 						UriFunction(inMessage[2]+"-"+inMessage[3]);
 						printOut.println("done!!");
 					}
