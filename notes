@@ -1,0 +1,47 @@
+do we have to maintain preference list?
+if so how do we implement it: create preference list for each incoming data or something else?
+
+Dynamo provides eventual consistency, which allows for updates to be propagated to all replicas asynchronously
+A put() call may return to its caller before the update has been applied at all the replicas, which can result in scenarios where a subsequent get()
+operation may return an object that does not have the latest updates.
+If there are no failures then there is a bound on the update propagation times. 
+
+Note that both “add to cart” and “delete item from cart” operations are translated into put requests to Dynamo
+When a customer wants to add an item to (or remove from) a shopping cart and the latest version is not available, the item is added to (or removed from)
+the older version and the divergent versions are reconciled later. 
+
+
+Dynamo uses vector clocks in order to capture causality between different versions of the same object.
+One vector clock is associated with every version of every object.
+If the counters on the first object’s clock are less-than-or-equal to all of the nodes in the second clock, then the first is an ancestor of the second and can be forgotten.
+Otherwise, the two changes are considered to be in conflict and require reconciliation.
+
+In Dynamo, when a client wishes to update an object, it must specify which version it is updating.
+This is done by passing the context it obtained from an earlier read operation, which contains the vector clock information.
+
+A node handling a read or write operation is known as the coordinator.
+if the node that receives the request is not in the prefered list it will forward the request to a node in the prefered list.
+
+To maintain consistency among its replicas, Dynamo uses a consistency protocol similar to those used in quorum systems.
+This protocol has two key configurable values: R and W. R is the minimum number of nodes that must participate in a successful
+read operation. W is the minimum number of nodes that must participate in a successful write operation.
+
+Setting R and W such that R + W > N yields a quorum-like system.
+In this model, the latency of a get (or put) operation is dictated by the slowest of the R (or W) replicas. 
+For this reason, R and W are usually configured to be less than N, to provide better latency.
+
+Upon receiving a put() request for a key, the coordinator generates the vector clock for the new version and writes the new version locally.
+The coordinator then sends the new version (along with the new vector clock) to the N highest-ranked reachable nodes. 
+If at least W-1 nodes respond then the write is considered successful. 
+
+Similarly, for a get() request, the coordinator requests all existing versions of data for that key from the N highest-ranked reachable
+nodes in the preference list for that key, and then waits for R responses before returning the result to the client.
+If the coordinator ends up gathering multiple versions of the data, it returns all the versions it deems to be causally unrelated. 
+The divergent versions are then reconciled and the reconciled version superseding the current versions is written back.
+
+
+Failures
+A node outage rarely signifies a permanent departure and therefore should not result in rebalancing of the partition assignment or repair of the unreachable replicas.
+
+
+

@@ -1,0 +1,8 @@
+1. a function in which a key will be passed and it will tell at which avd the key has to be passed.
+2. a list of 2 successor nodes
+3. a knoweledge that it can store data of 2 of its previous predecessors
+4. map of hashedkey and correspondiong node
+5. 
+
+
+
