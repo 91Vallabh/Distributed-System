@@ -12,6 +12,7 @@ import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
+import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -75,7 +76,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 
 		try {
 			this.nodeId = genHash(Integer.toString(Integer.parseInt(myPort) / 2));// 5554
-			//Log.i("node", this.nodeId);
+			Log.i("node", this.nodeId);
 		} catch (NoSuchAlgorithmException e) {
 			e.printStackTrace();
 		}
@@ -272,9 +273,9 @@ public class SimpleDynamoProvider extends ContentProvider {
 			this.keyToNode.put(keyMsg, this.myPortt);
 			sendToPreferences(keyMsg,line11);
 		} else {//wrong avd
-			String OpMsg = "insertWAVD" + "-" + trgtNode + "-" + keyMsg + "-" + valueMsg[0];
-				new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, OpMsg);
-				Log.i("insert", " insert came at wrong avd: " + this.myPortt + " sending to: " + trgtNode + " key is: " + keyMsg + "  msg is :" + valueMsg[0]);
+			String OpMsg = "insertWAVD" + "-" + trgtNode + "-" + keyMsg + "-" + (valueMsg[0]+ "." +trgtNode);
+				new ClientTask1().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, OpMsg);
+				Log.i("insert", " insert came at wrong avd: " + this.myPortt + " sending to: " + trgtNode + " key is: " + keyMsg + "  msg is :" + (valueMsg[0]+ "." +trgtNode));
 		}
 		return null;
 	}
@@ -329,30 +330,122 @@ public class SimpleDynamoProvider extends ContentProvider {
 
 	private String getFilesFromSuccessor(String str, String targetNode){
 		String line=null;
+		String nextPort="";
+		String nextPort2="";
+		Socket socket=null;
+//		String temp = genHash(Integer.toString(Integer.parseInt(msgToSend[1]) / 2)); //targetNode
+		String tempp=null;
+		try {
+			tempp= genHash(Integer.toString(Integer.parseInt(targetNode)/2));
+		} catch (NoSuchAlgorithmException e) {
+			e.printStackTrace();
+		}
+		Log.i("getFilesFromSuccessor"," target node is"+targetNode+ "  hashed vallue is: "+ tempp );
+		int indexS=0;
+		for(int i=0;i<nodeList.size();i++){
+			if(tempp.equals(nodeList.get(i))){
+				indexS=i;
+				break;
+			}
+		}
+		Log.i("getFilesFromSuccessor:"," index found is: "+indexS);
+		if(indexS==(nodeList.size()-1)) {
+			nextPort = dhtNodes.get(nodeList.get(0));
+			nextPort2 = dhtNodes.get(nodeList.get(1));
+		}
+		else if(indexS==(nodeList.size()-2)) {
+			nextPort = dhtNodes.get(nodeList.get(indexS + 1));
+			nextPort2 = dhtNodes.get(nodeList.get(0));
+		} else {
+			nextPort = dhtNodes.get(nodeList.get(indexS + 1));
+			nextPort2 = dhtNodes.get(nodeList.get(indexS + 2));
+		}
+		String[] ports={targetNode,nextPort,nextPort2};
 		try{
-			Socket socket = new Socket(InetAddress.getByAddress(new byte[]{10, 0, 2, 2}),
-					Integer.parseInt(targetNode));
 
-			PrintStream printOut = null;
-			BufferedReader inReader = null;
-			printOut = new PrintStream(socket.getOutputStream());
-			inReader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-			Log.e("to succ", "response from avd: "+this.myPortt+" type of query: "+str.split("\\-")[0]);
-			printOut.println(str);
-			printOut.flush();
-			line =  inReader.readLine();
-			Log.e("from succ", "response came on avd: "+this.myPortt+" type of query: "+str.split("\\-")[0] + "  response is: "+line);
-			socket.close();
-		}catch (SocketException se){
-			se.printStackTrace();
-		}
-		catch (UnknownHostException e) {
-			Log.e(TAG, "getFilesFrom Successor Unknown");
+			for(String port:ports) {
+				try {
+
+					socket = new Socket(InetAddress.getByAddress(new byte[]{10, 0, 2, 2}),
+							Integer.parseInt(port));
+					socket.setSoTimeout(1000);
+					PrintStream printOut = null;
+					BufferedReader inReader = null;
+					printOut = new PrintStream(socket.getOutputStream());
+					inReader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+					Log.e("to succ", "response from avd: " + this.myPortt + " type of query: " + str.split("\\-")[0]);
+					printOut.println(str);
+					printOut.flush();
+					line = inReader.readLine();
+					Log.e("from succ", "response came on avd: " + this.myPortt + " type of query: " + str.split("\\-")[0] + "  response is: " + line);
+					socket.close();
+					break;
+				} catch(SocketTimeoutException e){
+					socket.close();
+					e.printStackTrace();
+					continue;
+				} catch(NullPointerException e){
+					socket.close();
+					e.printStackTrace();
+					continue;
+				} catch (UnknownHostException e) {
+					socket.close();
+					e.printStackTrace();
+					continue;
+				} catch(IOException e){
+					socket.close();
+					e.printStackTrace();
+					continue;
+				} catch(Exception e){
+					socket.close();
+					e.printStackTrace();
+					continue;
+				}
+			}
+		} catch (Exception e){
 			e.printStackTrace();
-		} catch (IOException e) {
-			Log.e(TAG, "getFilesFrom Successor  socket IOException");
-			e.printStackTrace();
 		}
+		return line;
+	}
+
+	private String getFilesFromSuccessor1(String str, String targetNode){
+				Socket socket=null;
+				String line=null;
+				try {
+					try {
+						socket = new Socket(InetAddress.getByAddress(new byte[]{10, 0, 2, 2}),
+								Integer.parseInt(targetNode));
+						socket.setSoTimeout(1000);
+						PrintStream printOut = null;
+						BufferedReader inReader = null;
+						printOut = new PrintStream(socket.getOutputStream());
+						inReader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+						Log.e("to succ", "response from avd: " + this.myPortt + " type of query: " + str.split("\\-")[0]);
+						printOut.println(str);
+						printOut.flush();
+						line = inReader.readLine();
+						Log.e("from succ", "response came on avd: " + this.myPortt + " type of query: " + str.split("\\-")[0] + "  response is: " + line);
+						socket.close();
+					} catch (SocketTimeoutException e) {
+						socket.close();
+						e.printStackTrace();
+					} catch (NullPointerException e) {
+						socket.close();
+						e.printStackTrace();
+					} catch (UnknownHostException e) {
+						socket.close();
+						e.printStackTrace();
+					} catch (IOException e) {
+						socket.close();
+						e.printStackTrace();
+					} catch (Exception e) {
+						socket.close();
+						e.printStackTrace();
+					}
+				} catch (Exception e){
+					e.printStackTrace();
+				}
+
 		return line;
 	}
 
@@ -368,10 +461,12 @@ public class SimpleDynamoProvider extends ContentProvider {
 			Log.i("getFileFromAvd","file not mapped to this avd forwarding request to this avd: "+ trgtNode);
 			String allFiles=null;
 			allFiles = getFilesFromSuccessor("$-"+selection, trgtNode);
-			String[] tempStr = allFiles.split("\\-");
-			Log.e("getFileFromAvd","length of returned line object: "+tempStr.length);
-			Log.e("getFileFromAvd","key is: "+tempStr[0]+"  value is: "+tempStr[1]);
-			matrixCursorObject.addRow(new String[]{tempStr[0], (tempStr[1].split("\\.")[0]) });
+			if(allFiles!=null) {
+				String[] tempStr = allFiles.split("\\-");
+				Log.e("getFileFromAvd", "length of returned line object: " + tempStr.length);
+				Log.e("getFileFromAvd", "key is: " + tempStr[0] + "  value is: " + tempStr[1]);
+				matrixCursorObject.addRow(new String[]{tempStr[0], (tempStr[1].split("\\.")[0])});
+			}
 		}
 
 
@@ -426,25 +521,17 @@ public class SimpleDynamoProvider extends ContentProvider {
 		String allFiles=null;
 		String[] msgArray=null;
 		for(String port:REMOTE_PORT){
-//			if(!port.equals(myPortt)) {
-//
-//			}
-			allFiles = getFilesFromSuccessor("*-@", port);
-			msgArray = allFiles.split("\\|");
-			for(int i=0;i<msgArray.length;i++){
-				String[] tempStr = msgArray[i].split("\\-");
-				if(tempStr.length==2){
-					matrixCursorObject.addRow(new String[]{tempStr[0], (tempStr[1].split("\\.")[0])  });
+			allFiles = getFilesFromSuccessor1("*-@", port);
+			if(!allFiles.equals(null)) {
+				msgArray = allFiles.split("\\|");
+				for (int i = 0; i < msgArray.length; i++) {
+					String[] tempStr = msgArray[i].split("\\-");
+					if (tempStr.length == 2) {
+						matrixCursorObject.addRow(new String[]{tempStr[0], (tempStr[1].split("\\.")[0])});
+					}
 				}
 			}
 		}
-//		Log.e("all files",allFiles);
-//		for(int i=0;i<msgArray.length;i++){
-//			String[] tempStr = msgArray[i].split("\\-");
-//			if(tempStr.length==2){
-//				matrixCursorObject.addRow(new String[]{tempStr[0], (tempStr[1].split("\\.")[0])  });
-//			}
-//		}
 		return matrixCursorObject;
 
 	}
@@ -468,7 +555,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 	private void delFilesfromAllServers(){
 		delAllFilesFromAvd();
 		for(String port: REMOTE_PORT){
-			delFilesFromSuccessor("del*",port);
+			delFilesFromSuccessor1("del*",port);
 		}
 	}
 
@@ -493,34 +580,120 @@ public class SimpleDynamoProvider extends ContentProvider {
 	}
 
 	private void delFilesFromSuccessor(String str, String targetNode){
+		Socket socket=null;
 		String line=null;
-		try{
-			Socket socket = new Socket(InetAddress.getByAddress(new byte[]{10, 0, 2, 2}),
-					Integer.parseInt(targetNode));
-
-			PrintStream printOut = null;
-			BufferedReader inReader = null;
-			printOut = new PrintStream(socket.getOutputStream());
-			inReader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-			printOut.println(str);
-			printOut.flush();
-			line =  inReader.readLine();
-			socket.close();
-		}catch (SocketException se){
-			se.printStackTrace();
-		}
-		catch (UnknownHostException e) {
-			Log.e(TAG, "getFilesFrom Successor Unknown");
+		String nextPort="";
+		String nextPort2="";
+//		String temp = genHash(Integer.toString(Integer.parseInt(msgToSend[1]) / 2)); //targetNode
+		String tempp=null;
+		try {
+			tempp= genHash(Integer.toString(Integer.parseInt(targetNode)/2));
+		} catch (NoSuchAlgorithmException e) {
 			e.printStackTrace();
-		} catch (IOException e) {
-			Log.e(TAG, "getFilesFrom Successor  socket IOException");
+		}
+		Log.i("getFilesFromSuccessor"," target node is"+targetNode+ "  hashed vallue is: "+ tempp );
+		int indexS=0;
+		for(int i=0;i<nodeList.size();i++){
+			if(tempp.equals(nodeList.get(i))){
+				indexS=i;
+				break;
+			}
+		}
+		Log.i("getFilesFromSuccessor:"," index found is: "+indexS);
+		if(indexS==(nodeList.size()-1)) {
+			nextPort = dhtNodes.get(nodeList.get(0));
+			nextPort2 = dhtNodes.get(nodeList.get(1));
+		}
+		else if(indexS==(nodeList.size()-2)) {
+			nextPort = dhtNodes.get(nodeList.get(indexS + 1));
+			nextPort2 = dhtNodes.get(nodeList.get(0));
+		} else {
+			nextPort = dhtNodes.get(nodeList.get(indexS + 1));
+			nextPort2 = dhtNodes.get(nodeList.get(indexS + 2));
+		}
+		String[] ports={targetNode,nextPort,nextPort2};
+
+		try{
+			for(String port:ports) {
+				try {
+					socket = new Socket(InetAddress.getByAddress(new byte[]{10, 0, 2, 2}),
+							Integer.parseInt(port));
+
+					PrintStream printOut = null;
+					BufferedReader inReader = null;
+					printOut = new PrintStream(socket.getOutputStream());
+					inReader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+					printOut.println(str);
+					printOut.flush();
+					line = inReader.readLine();
+					socket.close();
+				} catch(SocketTimeoutException e){
+					socket.close();
+					e.printStackTrace();
+					continue;
+				} catch(NullPointerException e){
+					socket.close();
+					e.printStackTrace();
+					continue;
+				} catch (UnknownHostException e) {
+					socket.close();
+					e.printStackTrace();
+					continue;
+				} catch(IOException e){
+					socket.close();
+					e.printStackTrace();
+					continue;
+				} catch(Exception e){
+					socket.close();
+					e.printStackTrace();
+					continue;
+				}
+			}
+
+		}catch (Exception e){
+			e.printStackTrace();
+		}
+	}
+	private void delFilesFromSuccessor1(String str, String targetNode){
+		Socket socket=null;
+		String line="";
+		try{
+				try {
+					socket = new Socket(InetAddress.getByAddress(new byte[]{10, 0, 2, 2}),
+							Integer.parseInt(targetNode));
+
+					PrintStream printOut = null;
+					BufferedReader inReader = null;
+					printOut = new PrintStream(socket.getOutputStream());
+					inReader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+					printOut.println(str);
+					printOut.flush();
+					line = inReader.readLine();
+					socket.close();
+				} catch(SocketTimeoutException e){
+					socket.close();
+					e.printStackTrace();
+				} catch(NullPointerException e){
+					socket.close();
+					e.printStackTrace();
+				} catch (UnknownHostException e) {
+					socket.close();
+					e.printStackTrace();
+				} catch(IOException e){
+					socket.close();
+					e.printStackTrace();
+				} catch(Exception e){
+					socket.close();
+					e.printStackTrace();
+				}
+		}catch (Exception e){
 			e.printStackTrace();
 		}
 	}
 
 	private void delFromPrefNodes(String selection){
-		delFilesFromSuccessor(("del&"+"-"+selection),this.dhtNodes.get(this.preferenceList.get(0)));
-		delFilesFromSuccessor(("del&"+"-"+selection),this.dhtNodes.get(this.preferenceList.get(1)));
+		delFilesFromSuccessor1(("del&"+"-"+selection),this.dhtNodes.get(this.preferenceList.get(0)));
+		delFilesFromSuccessor1(("del&"+"-"+selection),this.dhtNodes.get(this.preferenceList.get(1)));
 	}
 
 	private void delSelFromPref(String selection){
@@ -592,6 +765,38 @@ public class SimpleDynamoProvider extends ContentProvider {
 			Log.i("del","for key: "+selection+" taget node found is: "+trgtNode+"  this avd is: "+this.myPortt);
 			delFilesFromSuccessor(("del@"+"-"+selection),trgtNode);
 		}
+	}
+
+	private void delFileFromAvd1(String selection){
+			File dir = getContext().getFilesDir();
+			try {
+				for (File file : dir.listFiles()) {
+					if (file.getName().equals(selection)) {
+//						Log.i("del","file: "+file.getName()+"  deleted");
+						delFromPrefNodes(selection);
+						this.keyToNode.remove(selection);
+						List<String> temp = this.NodeToKey.get(this.myPortt);
+						for(int i=0;i<temp.size();i++){
+							if(temp.get(i).equals(selection)){
+								temp.remove(i);
+								break;
+							}
+						}
+						this.NodeToKey.put(this.myPortt,temp);
+						file.delete();
+						break;
+					}
+				}
+			} catch (IllegalArgumentException iae) {
+				Log.e(TAG, "IllegalArgumentException in query ");
+				iae.printStackTrace();
+			} catch (NullPointerException npe) {
+				Log.e(TAG, "NullPointerException in query ");
+				npe.printStackTrace();
+			} catch (Exception e) {
+				Log.e(TAG, "Failed to return the cursor object!");
+				e.printStackTrace();
+			}
 	}
 
 	@Override
@@ -696,8 +901,14 @@ public class SimpleDynamoProvider extends ContentProvider {
 					//String OpMsg = "insertPref"+"-"+ dhtNodes.get(preferenceList.get(0))+"-"+keyMsg+"-"+line11;
 					if(inMessage[0].equals("insertWAVD") ) {
 						Log.i("server", "Insert on avd: "+inMessage[1] + " key: "+ inMessage[2]+  " msg "+inMessage[3]);
-						UriFunction(inMessage[2]+"-"+inMessage[3]);
-						printOut.println("done!!");
+						String[] inMessageBreak = inMessage[3].split("\\.");
+						if (inMessageBreak[1].equals(myPortt)){
+							UriFunction(inMessage[2]+"-"+inMessage[3]);
+							printOut.println("done!!");
+						} else {
+							insertAtPrefNode(inMessage[2]+"-"+inMessage[3]);
+							printOut.println("done!!");
+						}
 					}else if(inMessage[0].equals("insertPref")){
 						Log.i("server", "Insert on avd: "+inMessage[1] + " key: "+ inMessage[2]+  " msg "+inMessage[3]);
 						insertAtPrefNode(inMessage[2]+"-"+inMessage[3]);
@@ -724,7 +935,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 						}
 						printOut.println(line1);
 					} else if (inMessage[0].equals("del@")){
-						delFileFromAvd(inMessage[1]);
+						delFileFromAvd1(inMessage[1]);
 						printOut.println("done!!");
 					} else if (inMessage[0].equals("del*")){
 						delAllFilesFromAvd();
@@ -755,6 +966,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 				String msgToSend[] = msgs[0].split("\\-");
 				Socket socket = new Socket(InetAddress.getByAddress(new byte[]{10, 0, 2, 2}),
 						Integer.parseInt(msgToSend[1]));
+				socket.setSoTimeout(1000);
 				Log.i("client:","from avd: "+myPortt+" msg is being sent to : "+msgToSend[1]+" type of msg is: "+msgToSend[0]);
 				PrintStream printOut = null;
 				BufferedReader inReader = null;
@@ -764,13 +976,98 @@ public class SimpleDynamoProvider extends ContentProvider {
 				printOut.flush();
 				inReader.readLine();
 				socket.close();
-			}catch (SocketException se){
-				se.printStackTrace();
+			} catch(SocketTimeoutException e){
+				e.printStackTrace();
+			} catch(NullPointerException e){
+				e.printStackTrace();
+			} catch (UnknownHostException e) {
+				e.printStackTrace();
+			} catch(IOException e){
+				e.printStackTrace();
+			} catch(Exception e){
+				e.printStackTrace();
 			}
-			catch (UnknownHostException e) {
-				Log.e(TAG, "ClientTask UnknownHostException");
-			} catch (IOException e) {
-				Log.e(TAG, "ClientTask socket IOException");
+			return null;
+		}
+	}
+
+	private class ClientTask1 extends AsyncTask<String, Void, Void> {
+
+		String nextPort="";
+		String nextPort2="";
+		Socket socket=null;
+
+		@Override
+		protected Void doInBackground(String... msgs) {
+			try{
+
+				String msgToSend[] = msgs[0].split("\\-");//0 1 2 3.l
+
+				String temp = genHash(Integer.toString(Integer.parseInt(msgToSend[1]) / 2));//Integer.toString(Integer.parseInt(msgToSend[1]) / 2)
+				Log.i("client1:"," target port:"+msgToSend[1]+" hashed value:"+temp);
+				int indexS=0;
+				for(int i=0;i<nodeList.size();i++){
+					if(temp.equals(nodeList.get(i))){
+						indexS=i;
+						break;
+					}
+				}
+				Log.i("client1:"," index found is: "+indexS);
+
+				if(indexS==(nodeList.size()-1)) {
+					nextPort = dhtNodes.get(nodeList.get(0));
+					nextPort2 = dhtNodes.get(nodeList.get(1));
+				}
+				else if(indexS==(nodeList.size()-2)) {
+					nextPort = dhtNodes.get(nodeList.get(indexS + 1));
+					nextPort2 = dhtNodes.get(nodeList.get(0));
+				} else {
+					nextPort = dhtNodes.get(nodeList.get(indexS + 1));
+					nextPort2 = dhtNodes.get(nodeList.get(indexS + 2));
+				}
+				String[] ports={msgToSend[1],nextPort,nextPort2};
+				Log.i("client1", "key:"+msgToSend[2]+"  port1: "+msgToSend[1]+"   port2: "+nextPort+"   port3: "+nextPort2);
+				for(String port:ports) {
+					try {
+						socket = new Socket(InetAddress.getByAddress(new byte[]{10, 0, 2, 2}),
+								Integer.parseInt(port));
+						socket.setSoTimeout(1000);
+						Log.i("client1"," sending to: "+port);
+//						Log.i("client1:", "from avd: " + myPortt + " msg is being sent to : " + msgToSend[1] + " type of msg is: " + msgToSend[0]);
+						PrintStream printOut = null;
+						BufferedReader inReader = null;
+						printOut = new PrintStream(socket.getOutputStream());
+						inReader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+						printOut.println(msgs[0]);
+						printOut.flush();
+						inReader.readLine();
+						inReader.close();
+						printOut.close();
+						socket.close();
+//						break;
+					} catch(SocketTimeoutException e){
+						socket.close();
+						e.printStackTrace();
+						continue;
+					} catch(NullPointerException e){
+						socket.close();
+						e.printStackTrace();
+						continue;
+					} catch (UnknownHostException e) {
+						socket.close();
+						e.printStackTrace();
+						continue;
+					} catch(IOException e){
+						socket.close();
+						e.printStackTrace();
+						continue;
+					} catch(Exception e){
+						socket.close();
+						e.printStackTrace();
+						continue;
+					}
+				}
+			} catch (Exception e){
 				e.printStackTrace();
 			}
 			return null;
